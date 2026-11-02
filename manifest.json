@@ -1,0 +1,16 @@
+{
+  "name": "Currency Converter 貨幣轉換器",
+  "short_name": "貨幣轉換器",
+  "description": "即時匯率貨幣轉換器 — 幫緊你幫緊你！",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F8EFEA",
+  "theme_color": "#F8EFEA",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
