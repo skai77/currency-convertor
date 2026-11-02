@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Currency Converter · 貨幣轉換器</title>
+<style>
+  :root{
+    --text:#3A3330; --secondary:#8C7A6E; --canvas:#F8EFEA; --soft:#FDF9F6;
+    --surface:#F1E2DA; --border:#E7D5CB; --accent:#B4705C; --accent-soft:#F3E0D7;
+    --positive:#5E9A72; --error:#D06055; --error-soft:#F9E4E0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --text:#FFF8F4; --secondary:rgba(255,244,238,.62); --canvas:#211B19;
+      --soft:#282221; --surface:#3A322F; --border:rgba(255,240,230,.18);
+      --accent:#D89B87; --accent-soft:rgba(216,155,135,.14);
+      --positive:#72BC8F; --error:#E97366; --error-soft:rgba(233,115,102,.12);
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    background:var(--canvas); color:var(--text); font-size:16px; line-height:1.5;
+    display:flex; justify-content:center; padding:24px 16px;
+  }
+  .app{width:100%; max-width:460px}
+  header{text-align:center; margin-bottom:24px}
+  header h1{font-size:26px; font-weight:700; letter-spacing:-.02em}
+  header .tagline{
+    display:inline-block; margin-top:6px; font-size:15px; font-weight:600; color:var(--accent);
+    background:var(--accent-soft); border-radius:999px; padding:3px 14px;
+  }
+  header .meta-line{color:var(--secondary); font-size:13px; margin-top:8px}
+  .card{
+    background:var(--soft); border:1px solid var(--border); border-radius:12px;
+    padding:20px; margin-bottom:16px;
+  }
+  label{display:block; font-size:13px; font-weight:600; color:var(--secondary); margin-bottom:6px}
+  input[type=number]{
+    width:100%; padding:12px; font-size:18px; font-weight:600; color:var(--text);
+    background:var(--canvas); border:1px solid var(--border); border-radius:8px; outline:none;
+  }
+  input[type=number]:focus{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+  .row{display:flex; gap:12px; align-items:flex-end}
+  .row .field{flex:1; min-width:0}
+  .swap{
+    flex:0 0 44px; height:44px; border-radius:8px; border:1px solid var(--border);
+    background:var(--soft); cursor:pointer; font-size:18px; color:var(--secondary);
+    display:flex; align-items:center; justify-content:center; transition:all .15s;
+  }
+  .swap:hover{border-color:var(--accent); color:var(--accent); background:var(--accent-soft)}
+
+  /* flag icons */
+  .flag{width:22px; height:22px; border-radius:50%; object-fit:cover; flex:none;
+        box-shadow:0 0 0 1px var(--border); background:var(--surface)}
+  .flag-fb{width:22px; height:22px; border-radius:50%; flex:none; display:none;
+        align-items:center; justify-content:center; font-size:11px; font-weight:700;
+        color:var(--secondary); background:var(--surface); box-shadow:0 0 0 1px var(--border)}
+
+  /* searchable combo */
+  .combo{position:relative}
+  .combo input{
+    width:100%; padding:12px 36px 12px 44px; font-size:16px; font-weight:600; color:var(--text);
+    background:var(--canvas); border:1px solid var(--border); border-radius:8px; outline:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238C7A6E' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 12px center; cursor:pointer;
+  }
+  .combo input:focus{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); cursor:text}
+  .combo.active input{border-color:var(--accent)}
+  .combo .flag-wrap{position:absolute; left:12px; top:50%; transform:translateY(-50%); display:flex; pointer-events:none}
+  .dd{
+    display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:20;
+    background:var(--canvas); border:1px solid var(--border); border-radius:8px;
+    max-height:260px; overflow-y:auto; box-shadow:0 4px 12px rgba(58,51,48,.10);
+  }
+  .dd.open{display:block}
+  .dd .opt{
+    padding:10px 12px; cursor:pointer; display:flex; align-items:center; gap:10px; font-size:15px;
+  }
+  .dd .opt .code{font-weight:700}
+  .dd .opt .name{color:var(--secondary); font-size:13px; margin-left:auto; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .dd .opt:hover, .dd .opt.hl{background:var(--accent-soft)}
+  .dd .empty{padding:12px; color:var(--secondary); font-size:14px}
+
+  .result{
+    background:var(--accent-soft); border:1px solid var(--border); border-radius:12px;
+    padding:24px 20px; text-align:center; margin-bottom:16px;
+  }
+  .result .amount{font-size:34px; font-weight:700; letter-spacing:-.02em; word-break:break-all}
+  .result .rate{font-size:14px; color:var(--secondary); margin-top:8px}
+  .meta{display:flex; justify-content:space-between; align-items:center; font-size:13px; color:var(--secondary); flex-wrap:wrap; gap:8px}
+  .status{display:inline-flex; align-items:center; gap:6px}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--positive)}
+  .dot.stale{background:var(--error)}
+  .refresh{
+    border:1px solid var(--border); background:var(--soft); color:var(--secondary);
+    border-radius:8px; padding:6px 12px; font-size:13px; cursor:pointer; min-height:44px;
+  }
+  .refresh:hover{border-color:var(--accent); color:var(--accent)}
+  .quick-label{font-size:12px; color:var(--secondary); margin-top:14px}
+  .quick-label b{color:var(--accent)}
+  .quick{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px}
+  .chip{
+    border:1px solid var(--border); background:var(--canvas); color:var(--secondary);
+    border-radius:999px; padding:5px 12px 5px 6px; font-size:13px; cursor:pointer; min-height:32px;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .chip .flag, .chip .flag-fb{width:18px; height:18px; font-size:9px}
+  .chip:hover{border-color:var(--accent); color:var(--accent); background:var(--accent-soft)}
+  .error{
+    display:none; background:var(--error-soft); border:1px solid var(--error); color:var(--error);
+    border-radius:8px; padding:12px; font-size:14px; margin-bottom:16px;
+  }
+  .error.show{display:block}
+  footer{text-align:center; color:var(--secondary); font-size:12px; margin-top:16px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>💱 Currency Converter</h1><br>
+    <span class="tagline">幫緊你幫緊你！</span>
+    <p class="meta-line">即時匯率 · 支援 160+ 種貨幣 · 可搜尋</p>
+  </header>
+
+  <div class="error" id="error"></div>
+
+  <div class="card">
+    <label for="amount">金額 Amount</label>
+    <input type="number" id="amount" value="1000" min="0" step="any" inputmode="decimal">
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label for="fromInput">由 From</label>
+        <div class="combo" id="fromCombo">
+          <span class="flag-wrap" id="fromFlag"></span>
+          <input id="fromInput" autocomplete="off" spellcheck="false" placeholder="搜尋貨幣…" role="combobox" aria-expanded="false" aria-label="由 From">
+          <div class="dd" id="fromDD" role="listbox"></div>
+        </div>
+      </div>
+      <button class="swap" id="swap" title="對調 Swap" aria-label="對調貨幣">⇄</button>
+      <div class="field">
+        <label for="toInput">到 To</label>
+        <div class="combo" id="toCombo">
+          <span class="flag-wrap" id="toFlag"></span>
+          <input id="toInput" autocomplete="off" spellcheck="false" placeholder="搜尋貨幣…" role="combobox" aria-expanded="false" aria-label="到 To">
+          <div class="dd" id="toDD" role="listbox"></div>
+        </div>
+      </div>
+    </div>
+    <div class="quick-label">熱門貨幣 · 撳完套用去 <b id="quickTarget">到 To</b>（想套去邊格，先撳嗰格輸入框）</div>
+    <div class="quick" id="quick"></div>
+  </div>
+
+  <div class="result" id="resultCard">
+    <div class="amount" id="result">—</div>
+    <div class="rate" id="rateLine"></div>
+  </div>
+
+  <div class="meta">
+    <span class="status"><span class="dot" id="dot"></span><span id="updated">載入緊匯率…</span></span>
+    <button class="refresh" id="refresh">↻ 更新匯率</button>
+  </div>
+
+  <footer>Rates via currency-api / er-api / frankfurter · Flags via circle-flags · 僅供參考</footer>
+</div>
+
+<script>
+const SOURCES = [
+  { name:'currency-api CDN', url: b=>'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/'+b.toLowerCase()+'.json',
+    parse: (j,b)=>{ const r={}; for(const k in j[b.toLowerCase()]) r[k.toUpperCase()]=j[b.toLowerCase()][k]; return {rates:r, time:j.date}; } },
+  { name:'currency-api pages.dev', url: b=>'https://latest.currency-api.pages.dev/v1/currencies/'+b.toLowerCase()+'.json',
+    parse: (j,b)=>{ const r={}; for(const k in j[b.toLowerCase()]) r[k.toUpperCase()]=j[b.toLowerCase()][k]; return {rates:r, time:j.date}; } },
+  { name:'open.er-api.com', url: b=>'https://open.er-api.com/v6/latest/'+b,
+    parse: (j)=>{ if(j.result!=='success') throw new Error('bad payload'); return {rates:j.rates, time:j.time_last_update_utc}; } },
+  { name:'frankfurter', url: b=>'https://api.frankfurter.dev/v1/latest?base='+b,
+    parse: (j,b)=>({rates:{[b]:1, ...j.rates}, time:j.date}) },
+];
+const QUICK = ['HKD','USD','JPY','CNY','KRW','TWD','EUR','GBP','THB','SGD','AUD','MOP'];
+// currency -> country overrides where first two letters don't give the right flag
+const CC_OVERRIDE = { EUR:'eu', XCD:'ag', XOF:'sn', XAF:'cm', XPF:'nc', XDR:'', BTC:'', ETH:'', ANG:'cw' };
+function ccFor(code){ if(code in CC_OVERRIDE) return CC_OVERRIDE[code]; return code.slice(0,2).toLowerCase(); }
+function flagURL(code){ return 'https://cdn.jsdelivr.net/gh/HatScripts/circle-flags@2.0.0/flags/'+ccFor(code)+'.svg'; }
+function flagHTML(code){
+  if(ccFor(code)==='' ) return '<span class="flag-fb" style="display:inline-flex">'+code[0]+'</span>';
+  return '<img class="flag" loading="lazy" src="'+flagURL(code)+'" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-flex\'"><span class="flag-fb">'+code[0]+'</span>';
+}
+
+let rates = {};
+let baseCode = 'HKD';
+let codes = [];
+let lastFetch = null;
+let sourceName = '';
+let fromCode = 'HKD', toCode = 'USD';
+let activeField = 'to';
+const inIframe = (()=>{ try{ return window.self !== window.top; }catch(e){ return true; } })();
+
+const $ = id => document.getElementById(id);
+const amountEl=$('amount'), resultEl=$('result'), rateLine=$('rateLine'),
+      updatedEl=$('updated'), dotEl=$('dot'), errorEl=$('error'),
+      fromInput=$('fromInput'), toInput=$('toInput'),
+      fromDD=$('fromDD'), toDD=$('toDD'), quickTarget=$('quickTarget'),
+      fromFlag=$('fromFlag'), toFlag=$('toFlag');
+
+let displayNames = null;
+try{ displayNames = new Intl.DisplayNames(['zh-HK'], {type:'currency'}); }catch(e){}
+function cname(c){ try{ return displayNames ? displayNames.of(c) : ''; }catch(e){ return ''; } }
+
+function fmt(n, code){
+  try{ return new Intl.NumberFormat('zh-HK',{style:'currency',currency:code,maximumFractionDigits: n<1?4:2}).format(n); }
+  catch(e){ return n.toLocaleString()+' '+code; }
+}
+
+async function fetchFromSources(base){
+  const errors = [];
+  for(const s of SOURCES){
+    try{
+      const r = await fetch(s.url(base));
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const data = s.parse(await r.json(), base);
+      if(!data.rates || !Object.keys(data.rates).length) throw new Error('empty rates');
+      return {...data, source:s.name, errors};
+    }catch(e){ errors.push(s.name+': '+e.message); }
+  }
+  throw new Error(errors.join(' | '));
+}
+
+async function load(base, force){
+  base = base || fromCode || 'HKD';
+  errorEl.classList.remove('show');
+  updatedEl.textContent='載入緊匯率…';
+  try{
+    let data;
+    const cacheKey='fx2_'+base;
+    if(!force){
+      try{
+        const cached = localStorage.getItem(cacheKey);
+        if(cached){
+          const c = JSON.parse(cached);
+          if(Date.now()-c.ts < 3600e3) data = c;
+        }
+      }catch(e){}
+    }
+    if(!data){
+      data = await fetchFromSources(base);
+      try{ localStorage.setItem(cacheKey, JSON.stringify({...data, ts:Date.now()})); }catch(e){}
+    }
+    rates = data.rates; baseCode = base; lastFetch = data.time; sourceName = data.source||'快取';
+    codes = Object.keys(rates).sort();
+    if(!rates[toCode]) toCode = rates['USD']?'USD':codes[0];
+    syncInputs();
+    dotEl.className='dot';
+    updatedEl.textContent = '匯率更新：' + (lastFetch ? new Date(lastFetch).toLocaleString('zh-HK') : '剛剛') + '（'+sourceName+'）';
+    convert();
+  }catch(e){
+    dotEl.className='dot stale';
+    updatedEl.textContent='匯率載入失敗';
+    let msg = '⚠️ 未能連接匯率服務。';
+    if(inIframe) msg += '你而家係喺嵌入頁面入面用——部分網絡會封 embed 嘅對外連線，建議下載 HTML 檔案直接用瀏覽器開。';
+    else msg += '請檢查網絡（公司網/VPN 可能封咗匯率 API），再撳「更新匯率」重試。';
+    errorEl.innerHTML = msg + '<br><small style="opacity:.75">技術資料：'+String(e.message).replace(/</g,'&lt;')+'</small>';
+    errorEl.classList.add('show');
+  }
+}
+
+function syncInputs(){
+  fromInput.value = fromCode;
+  toInput.value = toCode;
+  fromFlag.innerHTML = flagHTML(fromCode);
+  toFlag.innerHTML = flagHTML(toCode);
+}
+
+function renderDD(dd, filter, onPick){
+  const f = (filter||'').trim().toLowerCase();
+  let list = codes;
+  if(f){
+    list = codes.filter(c => c.toLowerCase().includes(f) || cname(c).toLowerCase().includes(f));
+  }else{
+    const quick = QUICK.filter(c=>codes.includes(c));
+    const rest = codes.filter(c=>!quick.includes(c));
+    list = [...quick, ...rest];
+  }
+  if(!list.length){ dd.innerHTML='<div class="empty">搵唔到「'+filter.replace(/</g,'&lt;')+'」</div>'; return; }
+  dd.innerHTML = list.slice(0,80).map(c=>'<div class="opt" role="option" data-code="'+c+'">'+flagHTML(c)+'<span class="code">'+c+'</span><span class="name">'+cname(c)+'</span></div>').join('');
+  dd.querySelectorAll('.opt').forEach(o=>{
+    o.addEventListener('mousedown', e=>{ e.preventDefault(); onPick(o.dataset.code); });
+  });
+}
+
+function setupCombo(input, dd, field){
+  let hl = -1;
+  const isFrom = field==='from';
+  const getCode = ()=> isFrom ? fromCode : toCode;
+  const setCode = c=>{
+    if(isFrom){
+      fromCode = c; input.value = c;
+      fromFlag.innerHTML = flagHTML(c);
+      if(c !== baseCode && codes.includes(c)) load(c); else convert();
+    }else{
+      toCode = c; input.value = c;
+      toFlag.innerHTML = flagHTML(c);
+      convert();
+    }
+  };
+  const open = ()=>{
+    activeField = field;
+    quickTarget.textContent = isFrom ? '由 From' : '到 To';
+    renderDD(dd, input.value === getCode() ? '' : input.value, setCode);
+    dd.classList.add('open');
+    input.setAttribute('aria-expanded','true');
+    input.closest('.combo').classList.add('active');
+    hl = -1;
+    if(input.value === getCode()) input.select();
+  };
+  const close = ()=>{
+    dd.classList.remove('open');
+    input.setAttribute('aria-expanded','false');
+    input.closest('.combo').classList.remove('active');
+    const typed = input.value.trim().toUpperCase();
+    if(typed !== getCode()){
+      if(codes.includes(typed)) setCode(typed);
+      else input.value = getCode();
+    }
+  };
+  input.addEventListener('focus', open);
+  input.addEventListener('input', ()=>{ renderDD(dd, input.value, setCode); hl=-1; });
+  input.addEventListener('blur', ()=> setTimeout(close, 120));
+  input.addEventListener('keydown', e=>{
+    const opts = [...dd.querySelectorAll('.opt')];
+    if(e.key==='ArrowDown' || e.key==='ArrowUp'){
+      e.preventDefault();
+      if(!dd.classList.contains('open')){ open(); return; }
+      hl = e.key==='ArrowDown' ? Math.min(hl+1, opts.length-1) : Math.max(hl-1, 0);
+      opts.forEach((o,i)=>o.classList.toggle('hl', i===hl));
+      if(opts[hl]) opts[hl].scrollIntoView({block:'nearest'});
+    }else if(e.key==='Enter'){
+      if(dd.classList.contains('open') && opts[hl]){ setCode(opts[hl].dataset.code); input.blur(); }
+      else if(dd.classList.contains('open') && opts.length===1){ setCode(opts[0].dataset.code); input.blur(); }
+      else if(dd.classList.contains('open')){ const t=input.value.trim().toUpperCase(); if(codes.includes(t)){ setCode(t); input.blur(); } }
+    }else if(e.key==='Escape'){
+      input.value = getCode(); dd.classList.remove('open'); input.blur();
+    }
+  });
+}
+setupCombo(fromInput, fromDD, 'from');
+setupCombo(toInput, toDD, 'to');
+
+document.addEventListener('mousedown', e=>{
+  if(!e.target.closest('.combo')){
+    fromDD.classList.remove('open'); toDD.classList.remove('open');
+  }
+});
+
+function convert(){
+  const amt = parseFloat(amountEl.value);
+  if(isNaN(amt) || !rates[fromCode] || !rates[toCode]){ resultEl.textContent='—'; rateLine.textContent=''; return; }
+  const converted = amt / rates[fromCode] * rates[toCode];
+  resultEl.textContent = fmt(converted, toCode);
+  const unit = 1 / rates[fromCode] * rates[toCode];
+  rateLine.textContent = '1 '+fromCode+' = '+parseFloat(unit.toPrecision(6))+' '+toCode+' \u00B7 1 '+toCode+' = '+parseFloat((rates[fromCode]/rates[toCode]).toPrecision(6))+' '+fromCode;
+}
+
+amountEl.addEventListener('input', convert);
+$('swap').addEventListener('click', ()=>{
+  const f=fromCode; fromCode=toCode; toCode=f;
+  syncInputs();
+  if(fromCode!==baseCode && codes.includes(fromCode)) load(fromCode); else convert();
+});
+$('refresh').addEventListener('click', ()=>load(baseCode, true));
+
+const quickEl=$('quick');
+QUICK.forEach(c=>{
+  const b=document.createElement('button');
+  b.className='chip'; b.type='button';
+  b.innerHTML = flagHTML(c) + '<span>'+c+'</span>';
+  b.addEventListener('click', ()=>{
+    if(activeField==='from'){
+      fromCode = c; fromInput.value = c; fromFlag.innerHTML = flagHTML(c);
+      if(c!==baseCode && codes.includes(c)) load(c); else convert();
+    }else{
+      toCode = c; toInput.value = c; toFlag.innerHTML = flagHTML(c); convert();
+    }
+  });
+  quickEl.appendChild(b);
+});
+
+codes = [...QUICK];
+syncInputs();
+load('HKD');
+</script>
+</body>
+</html>
